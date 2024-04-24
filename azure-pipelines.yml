@@ -1,0 +1,51 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: Initialize
+  jobs:
+  - job: TerraformInitialize
+    steps:
+    - task: UseTerraform@0
+      inputs:
+        terraformVersion: '1.2.0'
+    - script: |
+        terraform init
+      displayName: 'Terraform Init'
+
+- stage: Plan
+  jobs:
+  - job: TerraformPlan
+    steps:
+    - task: UseTerraform@0
+      inputs:
+        terraformVersion: '1.2.0'
+    - script: |
+        terraform plan -out=tfplan
+      displayName: 'Terraform Plan'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'tfplan'
+        ArtifactName: 'tfplan'
+        publishLocation: 'container'
+
+- stage: Apply
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: TerraformApply
+    steps:
+    - task: UseTerraform@0
+      inputs:
+        terraformVersion: '1.2.0'
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'tfplan'
+        downloadPath: '$(System.ArtifactsDirectory)'
+    - script: |
+        terraform apply -auto-approve $(System.ArtifactsDirectory)/tfplan
+      displayName: 'Terraform Apply'
