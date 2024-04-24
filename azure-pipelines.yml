@@ -4,48 +4,37 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-stages:
-- stage: Initialize
-  jobs:
-  - job: TerraformInitialize
-    steps:
-    - task: UseTerraform@0
-      inputs:
-        terraformVersion: '1.2.0'
-    - script: |
-        terraform init
-      displayName: 'Terraform Init'
+steps:
+# Install the latest version of Terraform using a specific TerraformInstaller task
+- task: JasonBJohnson.azure-pipelines-tasks-terraform.azure-pipelines-tasks-terraform-installer.TerraformInstaller@0
+  displayName: 'Install latest Terraform'
+  inputs:
+    terraformVersion: 'latest'
 
-- stage: Plan
-  jobs:
-  - job: TerraformPlan
-    steps:
-    - task: UseTerraform@0
-      inputs:
-        terraformVersion: '1.2.0'
-    - script: |
-        terraform plan -out=tfplan
-      displayName: 'Terraform Plan'
-    - task: PublishBuildArtifacts@1
-      inputs:
-        PathtoPublish: 'tfplan'
-        ArtifactName: 'tfplan'
-        publishLocation: 'container'
+# Install a specific version of Terraform (e.g., 0.14.3) using a specific TerraformInstaller task
+- task: JasonBJohnson.azure-pipelines-tasks-terraform.azure-pipelines-tasks-terraform-installer.TerraformInstaller@0
+  displayName: 'Install specific Terraform version'
+  inputs:
+    terraformVersion: '0.14.3'
 
-- stage: Apply
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  jobs:
-  - job: TerraformApply
-    steps:
-    - task: UseTerraform@0
-      inputs:
-        terraformVersion: '1.2.0'
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: 'current'
-        downloadType: 'single'
-        artifactName: 'tfplan'
-        downloadPath: '$(System.ArtifactsDirectory)'
-    - script: |
-        terraform apply -auto-approve $(System.ArtifactsDirectory)/tfplan
-      displayName: 'Terraform Apply'
+# Check Terraform version
+- task: TerraformCLI@0
+  displayName: 'Check Terraform version'
+  inputs:
+    command: 'version'
+
+# Apply Terraform configuration with service connection and subscription ID override
+- task: TerraformCLI@1
+  displayName: 'Terraform Apply with Azure Service Connection'
+  inputs:
+    command: 'apply'
+    environmentServiceName: 'My Azure Service Connection'
+    providerAzureRmSubscriptionId: 'my-backend-subscription-id'
+
+# Apply Terraform configuration with automatic Azure CLI login
+- task: TerraformCLI@1
+  displayName: 'Terraform Apply with Az Login'
+  inputs:
+    command: 'apply'
+    environmentServiceName: 'My Azure Service Connection'
+    runAzLogin: true
